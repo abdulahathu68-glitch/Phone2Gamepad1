@@ -1,0 +1,58 @@
+name: Unzip design files
+
+on:
+  push:
+    paths:
+      - '*.zip'          # any zip uploaded to the repo root
+  workflow_dispatch:
+
+permissions:
+  contents: write        # needed so the bot can commit the extracted files
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract zips into design/stitch
+        run: |
+          shopt -s nullglob
+          zips=(*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "No zip files found in the repo root."
+            exit 0
+          fi
+
+          for zip in "${zips[@]}"; do
+            echo "Extracting $zip"
+            tmp=$(mktemp -d)
+            unzip -q "$zip" -d "$tmp"
+
+            # Handle both the Stitch export (one top-level folder)
+            # and the packaged zip (design/stitch inside)
+            if [ -d "$tmp/design/stitch" ]; then
+              src="$tmp/design/stitch"
+            else
+              src=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            fi
+
+            mkdir -p design/stitch
+            cp -r "$src"/. design/stitch/
+            rm -rf "$tmp"
+
+            git rm -q "$zip"
+          done
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add design
+          if git diff --cached --quiet; then
+            echo "Nothing new to commit."
+          else
+            git commit -m "Unzip design files [skip ci]"
+            git push
+          fi
