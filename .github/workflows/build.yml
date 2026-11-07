@@ -9,7 +9,6 @@ on:
 permissions:
   contents: read
 
-# If you push again while a build is running, cancel the old one
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -30,15 +29,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Caches Gradle downloads between runs, so later builds are faster
+      # Installs Gradle 8.9 and puts the "gradle" command on the PATH
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
-      - name: Check Gradle wrapper files
+      # Creates gradlew and gradle-wrapper.jar if they are not in the repo
+      - name: Generate Gradle wrapper if missing
         run: |
           if [ ! -f gradlew ] || [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "::error::gradlew or gradle-wrapper.jar is missing. Open the project in Android Studio and commit both files."
-            exit 1
+            echo "Wrapper missing, generating it"
+            gradle wrapper --gradle-version 8.9
           fi
           chmod +x gradlew
 
